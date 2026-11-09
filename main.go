@@ -97,7 +97,7 @@ func (a *app) first(ctx context.Context, flag float64, queries ...string) (Input
 	return Input{0, "unknown"}, nil
 }
 
-func (a *app) peak(q string) string { return fmt.Sprintf("max_over_time((%s)[%s:5m])", q, a.window) }
+func (a *app) peak(q string) string { return fmt.Sprintf("max_over_time((%s)[%s:1m])", q, a.window) }
 
 // grouped returns label value -> {current, peak} for sum by(label)(expr).
 func (a *app) grouped(ctx context.Context, label, expr string) (map[string][2]float64, error) {
@@ -114,6 +114,7 @@ func (a *app) grouped(ctx context.Context, label, expr string) (map[string][2]fl
 		for _, x := range s {
 			v := out[x.Labels[label]]
 			v[i] = x.V
+			v[1] = math.Max(v[0], v[1]) // subquery steps can miss the newest minute
 			out[x.Labels[label]] = v
 		}
 	}
@@ -130,7 +131,13 @@ func sel(matchers ...string) string {
 	return "{" + strings.Join(m, ",") + "}"
 }
 
-const rwSamples = `__name__=~"prometheus_remote_storage_(samples|histograms)_total"`
+// rwRate sums float samples + native histograms sent by remote_write. Separate selectors because
+// rate() drops __name__, so a name-regex selector errors with duplicate labelsets.
+func rwRate(by, sel string) string {
+	s := fmt.Sprintf("sum%s(rate(prometheus_remote_storage_samples_total%s[5m]))", by, sel)
+	h := fmt.Sprintf("sum%s(rate(prometheus_remote_storage_histograms_total%s[5m]))", by, sel)
+	return fmt.Sprintf("%s + (%s or %s * 0)", s, h, s) // senders without the histograms counter add 0
+}
 
 func gather(ctx context.Context, cli *CLI, a *app) (Inputs, error) {
 	in := Inputs{RF: cli.ReplicationFactor, RetentionDays: cli.RetentionDays}
@@ -144,13 +151,13 @@ func gather(ctx context.Context, cli *CLI, a *app) (Inputs, error) {
 		flag float64
 		qs   []string
 	}{
-		{&in.ActiveSeries, cli.ActiveSeries, []string{
+		{&in.ActiveSeries, 0, []string{ // measured; overrides applied below
 			"sum(prometheus_tsdb_head_series)",
 			"sum(prometheus_remote_write_wal_storage_active_series" + sel(cli.AlloySelector) + ")",
 			fmt.Sprintf("sum(cortex_ingester_memory_series) / %d", in.RF),
 		}},
-		{&in.SamplesPerSec, cli.SamplesPerSec, []string{
-			"sum(rate(" + sel(rwSamples, mimirURL, cli.AlloySelector) + "[5m]))",
+		{&in.SamplesPerSec, 0, []string{
+			rwRate("", sel(mimirURL, cli.AlloySelector)),
 			"sum(rate(cortex_distributor_received_samples_total[5m]))",
 		}},
 		{&in.QPS, cli.QPS, []string{
@@ -177,21 +184,36 @@ func gather(ctx context.Context, cli *CLI, a *app) (Inputs, error) {
 		}
 	}
 
+	// Scrape interval comes from the measured pair only, so a what-if override of series or
+	// samples/s rescales the other instead of producing a nonsense interval.
+	mSeries, mSamples := in.ActiveSeries, in.SamplesPerSec
 	switch {
 	case cli.ScrapeInterval > 0:
 		in.ScrapeIntervalSec = Input{cli.ScrapeInterval.Seconds(), "flag/config"}
-	case in.ActiveSeries.V > 0 && in.SamplesPerSec.V > 0:
-		in.ScrapeIntervalSec = Input{in.ActiveSeries.V / in.SamplesPerSec.V, "derived: active series / samples/s"}
+	case cli.ActiveSeries > 0 && cli.SamplesPerSec > 0:
+		in.ScrapeIntervalSec = Input{cli.ActiveSeries / cli.SamplesPerSec, "derived: active series / samples/s flags"}
+	case mSeries.V > 0 && mSamples.V > 0:
+		in.ScrapeIntervalSec = Input{mSeries.V / mSamples.V, "derived: measured active series / samples/s"}
 	default:
 		in.ScrapeIntervalSec = Input{15, "default (doc assumption)"}
 	}
+	si := in.ScrapeIntervalSec.V
 	switch {
-	case in.ActiveSeries.V == 0 && in.SamplesPerSec.V == 0:
+	case cli.ActiveSeries > 0:
+		in.ActiveSeries = Input{cli.ActiveSeries, "flag/config"}
+	case cli.SamplesPerSec > 0:
+		in.ActiveSeries = Input{cli.SamplesPerSec * si, "derived: samples/s × scrape interval"}
+	case mSeries.V > 0: // keep measured value
+	case mSamples.V > 0:
+		in.ActiveSeries = Input{mSamples.V * si, "derived: samples/s × scrape interval"}
+	default:
 		return in, fmt.Errorf("active series unknown: set --active-series or --samples-per-sec, or point --prom-url at data")
-	case in.ActiveSeries.V == 0:
-		in.ActiveSeries = Input{in.SamplesPerSec.V * in.ScrapeIntervalSec.V, "derived: samples/s × scrape interval"}
-	case in.SamplesPerSec.V == 0:
-		in.SamplesPerSec = Input{in.ActiveSeries.V / in.ScrapeIntervalSec.V, "derived: active series / scrape interval (doc formula)"}
+	}
+	switch {
+	case cli.SamplesPerSec > 0:
+		in.SamplesPerSec = Input{cli.SamplesPerSec, "flag/config"}
+	case cli.ActiveSeries > 0 || mSamples.V == 0:
+		in.SamplesPerSec = Input{in.ActiveSeries.V / si, "derived: active series / scrape interval (doc formula)"}
 	}
 	return in, nil
 }
@@ -205,7 +227,7 @@ func run(ctx context.Context, cli *CLI, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	rwBy, err := a.grouped(ctx, "url", "rate("+sel(rwSamples, cli.AlloySelector)+"[5m])")
+	rwBy, err := a.grouped(ctx, "url", rwRate(" by (url) ", sel(cli.AlloySelector)))
 	if err != nil {
 		return err
 	}
@@ -266,7 +288,7 @@ func report(w io.Writer, cli *CLI, in Inputs, rwBy, lokiEntries, lokiBytes, evic
 
 	p("## Alloy write throughput (window %s)\n\nRequires Alloy self-metrics (`prometheus.exporter.self` or a scrape of :12345/metrics) in the queried source.\n", cli.Window)
 	p("### Samples to remote_write targets — float samples + native histograms\n\nInput samples/s above only counts urls matching `%s`.\n\n| remote_write url | samples/s now | samples/s peak |\n|---|---:|---:|", cli.MimirURLRegex)
-	tableRows(w, rwBy, fmtNum)
+	tableRows(w, rwBy, fmtRate)
 	p("\n### Log entries to Loki (`loki.write`)\n\n| host | entries/s now | entries/s peak | MB/s now | MB/s peak |\n|---|---:|---:|---:|---:|")
 	if len(lokiEntries) == 0 {
 		p("| _no data_ | | | | |")
@@ -278,7 +300,7 @@ func report(w io.Writer, cli *CLI, in Inputs, rwBy, lokiEntries, lokiBytes, evic
 	}
 	for _, k := range keys(lokiEntries) {
 		e, b := lokiEntries[k], lokiBytes[k]
-		p("| %s | %s | %s | %.2f | %.2f |", k, fmtNum(e[0]), fmtNum(e[1]), b[0]/1e6, b[1]/1e6)
+		p("| %s | %s | %s | %.2f | %.2f |", k, fmtRate(e[0]), fmtRate(e[1]), b[0]/1e6, b[1]/1e6)
 	}
 
 	p("\n## Caches\n\nScale memcached out if evictions are consistently > 0.\n\n| instance | evictions/s now | evictions/s peak |\n|---|---:|---:|")
@@ -308,6 +330,14 @@ func keys(m map[string][2]float64) []string {
 	}
 	sort.Strings(k)
 	return k
+}
+
+// fmtRate keeps two decimals for small rates that fmtNum would round to 0.
+func fmtRate(v float64) string {
+	if v < 100 {
+		return fmt.Sprintf("%.2f", v)
+	}
+	return fmtNum(v)
 }
 
 // fmtNum rounds to an integer with thousands separators.

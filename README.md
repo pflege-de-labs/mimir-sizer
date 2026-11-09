@@ -25,14 +25,14 @@ A flag value > 0 wins over a query. `./mimir-sizer --help` lists all flags.
 
 ## Where inputs come from
 
-All queried values are the **peak** over `--window` (default 24h, 5m resolution). First query with data wins;
+All queried values are the **peak** over `--window` (default 24h, 1m resolution). First query with data wins;
 the report states the source of each value.
 
 | Input | Queries, in order |
 |---|---|
 | Active series | `prometheus_tsdb_head_series`, Alloy `prometheus_remote_write_wal_storage_active_series`, Mimir `cortex_ingester_memory_series / RF` |
 | Samples/s | Alloy `prometheus_remote_storage_{samples,histograms}_total` (filtered by `--mimir-url-regex`), Mimir `cortex_distributor_received_samples_total`; else `series / scrape interval` |
-| Scrape interval | flag; else `series / samples/s`; else 15s |
+| Scrape interval | flag; else measured `series / samples/s`; else 15s. Overriding series or samples/s rescales the other with this interval |
 | Queries/s | Mimir `cortex_query_frontend_queries_total{op=~"query\|query_range"}`, Prometheus `prometheus_http_requests_total` |
 | Rule evals/s | `cortex_prometheus_rule_evaluations_total`, `prometheus_rule_evaluations_total` |
 | Alerts | `alertmanager_alerts_received_total`, `alertmanager_alerts` (and `cortex_` variants) |

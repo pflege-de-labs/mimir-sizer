@@ -63,7 +63,7 @@ func TestRunAgainstFakeProm(t *testing.T) {
 		switch {
 		case strings.Contains(q, "wal_storage_active_series"):
 			res = `{"metric":{},"value":[1,"600000"]}`
-		case strings.Contains(q, "sum(rate({__name__"):
+		case strings.HasPrefix(q, "max_over_time((sum(rate(prometheus_remote_storage_samples_total"):
 			res = `{"metric":{},"value":[1,"20000"]}`
 		case strings.Contains(q, "sum by (url)"):
 			res = `{"metric":{"url":"http://mimir/api/v1/push"},"value":[1,"20000"]}`
@@ -75,6 +75,17 @@ func TestRunAgainstFakeProm(t *testing.T) {
 		fmt.Fprintf(w, `{"status":"success","data":{"resultType":"vector","result":[%s]}}`, res)
 	}))
 	defer srv.Close()
+
+	whatIf := &CLI{PromURL: srv.URL, Tenant: "t1", Window: "24h", MimirURLRegex: ".*", ReplicationFactor: 3, RetentionDays: 365, ActiveSeries: 1.2e6}
+	in, err := gather(context.Background(), whatIf, &app{prom: newPromClient(srv.URL, "t1", "", "", ""), window: "24h"})
+	if err != nil || in.ScrapeIntervalSec.V != 30 || in.SamplesPerSec.V != 40000 {
+		t.Fatalf("what-if override: interval %v samples %v err %v, want 30 / 40000", in.ScrapeIntervalSec.V, in.SamplesPerSec.V, err)
+	}
+
+	whatIf.SamplesPerSec = 1e5 // both flags: interval from the flag pair, not the measured one
+	if in, err = gather(context.Background(), whatIf, &app{prom: newPromClient(srv.URL, "t1", "", "", ""), window: "24h"}); err != nil || in.ScrapeIntervalSec.V != 12 {
+		t.Fatalf("both flags: interval %v err %v, want 12", in.ScrapeIntervalSec.V, err)
+	}
 
 	cli := &CLI{PromURL: srv.URL, Tenant: "t1", Window: "24h", MimirURLRegex: ".*", ReplicationFactor: 3, RetentionDays: 365, QPS: 10}
 	var out bytes.Buffer
