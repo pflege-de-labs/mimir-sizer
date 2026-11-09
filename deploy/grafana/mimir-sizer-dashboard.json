@@ -1,0 +1,1197 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "panels": [
+    {
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "content": "Sizing per the [Mimir capacity planning guide](https://grafana.com/docs/mimir/latest/manage/run-production-environment/planning-capacity/). Measured inputs are **peaks over the dashboard time range**; unknown inputs are 0 — set the override variables for a new setup. Alloy tables need Alloy self-metrics in the selected datasource.",
+        "mode": "markdown"
+      },
+      "title": "About",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector($series)",
+          "format": "time_series",
+          "instant": true,
+          "legendFormat": "Active series",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector($samples)",
+          "format": "time_series",
+          "instant": true,
+          "legendFormat": "Samples/s",
+          "range": false,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector($scrape_interval)",
+          "format": "time_series",
+          "instant": true,
+          "legendFormat": "Scrape interval (s)",
+          "range": false,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector($qps)",
+          "format": "time_series",
+          "instant": true,
+          "legendFormat": "Queries/s",
+          "range": false,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector($rules)",
+          "format": "time_series",
+          "instant": true,
+          "legendFormat": "Rule evals/s",
+          "range": false,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector($notifications)",
+          "format": "time_series",
+          "instant": true,
+          "legendFormat": "Alert notifications/s",
+          "range": false,
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector($firing_alerts)",
+          "format": "time_series",
+          "instant": true,
+          "legendFormat": "Firing alerts",
+          "range": false,
+          "refId": "G"
+        }
+      ],
+      "title": "Inputs",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Minimum per component; +50% = recommended headroom for traffic peaks. Ruler sized for internal mode.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Memory"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decgbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Disk"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decgbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Memory +50%"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decgbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Disk +50%"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decgbytes"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 3,
+      "options": {
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "label_replace(vector($samples / 25000), \"component\", \"distributor\", \"\", \"\") or label_replace(vector($series * $rf / 300000), \"component\", \"ingester\", \"\", \"\") or label_replace(vector($qps / 250), \"component\", \"query-frontend\", \"\", \"\") or label_replace(vector($qps / 500), \"component\", \"query-scheduler\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"querier\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"store-gateway\", \"\", \"\") or label_replace(vector($rules / 10), \"component\", \"ruler\", \"\", \"\") or label_replace(clamp_min(ceil(vector($series / 20000000)), 1), \"component\", \"compactor\", \"\", \"\") or label_replace(vector($notifications / 100), \"component\", \"alertmanager\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "label_replace(vector($samples / 25000), \"component\", \"distributor\", \"\", \"\") or label_replace(vector($series * $rf / 300000 * 2.5), \"component\", \"ingester\", \"\", \"\") or label_replace(vector($qps / 250), \"component\", \"query-frontend\", \"\", \"\") or label_replace(vector($qps / 500 * 0.1), \"component\", \"query-scheduler\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"querier\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"store-gateway\", \"\", \"\") or label_replace(vector($rules / 10), \"component\", \"ruler\", \"\", \"\") or label_replace(clamp_min(ceil(vector($series / 20000000)), 1) * 4, \"component\", \"compactor\", \"\", \"\") or label_replace(vector($firing_alerts / 5000), \"component\", \"alertmanager\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "label_replace(vector(0), \"component\", \"distributor\", \"\", \"\") or label_replace(vector($series * $rf / 300000 * 5), \"component\", \"ingester\", \"\", \"\") or label_replace(vector(0), \"component\", \"query-frontend\", \"\", \"\") or label_replace(vector(0), \"component\", \"query-scheduler\", \"\", \"\") or label_replace(vector(0), \"component\", \"querier\", \"\", \"\") or label_replace(vector($series * $retention_days * 86400 / $scrape_interval * 2 * 0.001 * 3 / 1e9), \"component\", \"store-gateway\", \"\", \"\") or label_replace(vector(0), \"component\", \"ruler\", \"\", \"\") or label_replace(clamp_min(ceil(vector($series / 20000000)), 1) * 300, \"component\", \"compactor\", \"\", \"\") or label_replace(vector(0), \"component\", \"alertmanager\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "C"
+        }
+      ],
+      "title": "Microservices mode",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Memory +50%",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #B"
+                }
+              },
+              "operator": "*",
+              "right": {
+                "fixed": "1.5"
+              }
+            },
+            "mode": "binary"
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Disk +50%",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #C"
+                }
+              },
+              "operator": "*",
+              "right": {
+                "fixed": "1.5"
+              }
+            },
+            "mode": "binary"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "CPU cores",
+              "Value #B": "Memory",
+              "Value #C": "Disk"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "component"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Sum of all components. Ingest is replicated RF times, so run at least RF instances.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Memory"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decgbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Disk"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decgbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Memory +50%"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decgbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Disk +50%"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decgbytes"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 4,
+      "options": {
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "label_replace(sum(label_replace(vector($samples / 25000), \"component\", \"distributor\", \"\", \"\") or label_replace(vector($series * $rf / 300000), \"component\", \"ingester\", \"\", \"\") or label_replace(vector($qps / 250), \"component\", \"query-frontend\", \"\", \"\") or label_replace(vector($qps / 500), \"component\", \"query-scheduler\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"querier\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"store-gateway\", \"\", \"\") or label_replace(vector($rules / 10), \"component\", \"ruler\", \"\", \"\") or label_replace(clamp_min(ceil(vector($series / 20000000)), 1), \"component\", \"compactor\", \"\", \"\") or label_replace(vector($notifications / 100), \"component\", \"alertmanager\", \"\", \"\")), \"scope\", \"cluster total\", \"\", \"\") or label_replace(sum(label_replace(vector($samples / 25000), \"component\", \"distributor\", \"\", \"\") or label_replace(vector($series * $rf / 300000), \"component\", \"ingester\", \"\", \"\") or label_replace(vector($qps / 250), \"component\", \"query-frontend\", \"\", \"\") or label_replace(vector($qps / 500), \"component\", \"query-scheduler\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"querier\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"store-gateway\", \"\", \"\") or label_replace(vector($rules / 10), \"component\", \"ruler\", \"\", \"\") or label_replace(clamp_min(ceil(vector($series / 20000000)), 1), \"component\", \"compactor\", \"\", \"\") or label_replace(vector($notifications / 100), \"component\", \"alertmanager\", \"\", \"\")) / $rf, \"scope\", \"per instance (÷ RF, rough)\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "label_replace(sum(label_replace(vector($samples / 25000), \"component\", \"distributor\", \"\", \"\") or label_replace(vector($series * $rf / 300000 * 2.5), \"component\", \"ingester\", \"\", \"\") or label_replace(vector($qps / 250), \"component\", \"query-frontend\", \"\", \"\") or label_replace(vector($qps / 500 * 0.1), \"component\", \"query-scheduler\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"querier\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"store-gateway\", \"\", \"\") or label_replace(vector($rules / 10), \"component\", \"ruler\", \"\", \"\") or label_replace(clamp_min(ceil(vector($series / 20000000)), 1) * 4, \"component\", \"compactor\", \"\", \"\") or label_replace(vector($firing_alerts / 5000), \"component\", \"alertmanager\", \"\", \"\")), \"scope\", \"cluster total\", \"\", \"\") or label_replace(sum(label_replace(vector($samples / 25000), \"component\", \"distributor\", \"\", \"\") or label_replace(vector($series * $rf / 300000 * 2.5), \"component\", \"ingester\", \"\", \"\") or label_replace(vector($qps / 250), \"component\", \"query-frontend\", \"\", \"\") or label_replace(vector($qps / 500 * 0.1), \"component\", \"query-scheduler\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"querier\", \"\", \"\") or label_replace(vector($qps / 10), \"component\", \"store-gateway\", \"\", \"\") or label_replace(vector($rules / 10), \"component\", \"ruler\", \"\", \"\") or label_replace(clamp_min(ceil(vector($series / 20000000)), 1) * 4, \"component\", \"compactor\", \"\", \"\") or label_replace(vector($firing_alerts / 5000), \"component\", \"alertmanager\", \"\", \"\")) / $rf, \"scope\", \"per instance (÷ RF, rough)\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "label_replace(sum(label_replace(vector(0), \"component\", \"distributor\", \"\", \"\") or label_replace(vector($series * $rf / 300000 * 5), \"component\", \"ingester\", \"\", \"\") or label_replace(vector(0), \"component\", \"query-frontend\", \"\", \"\") or label_replace(vector(0), \"component\", \"query-scheduler\", \"\", \"\") or label_replace(vector(0), \"component\", \"querier\", \"\", \"\") or label_replace(vector($series * $retention_days * 86400 / $scrape_interval * 2 * 0.001 * 3 / 1e9), \"component\", \"store-gateway\", \"\", \"\") or label_replace(vector(0), \"component\", \"ruler\", \"\", \"\") or label_replace(clamp_min(ceil(vector($series / 20000000)), 1) * 300, \"component\", \"compactor\", \"\", \"\") or label_replace(vector(0), \"component\", \"alertmanager\", \"\", \"\")), \"scope\", \"cluster total\", \"\", \"\") or label_replace(sum(label_replace(vector(0), \"component\", \"distributor\", \"\", \"\") or label_replace(vector($series * $rf / 300000 * 5), \"component\", \"ingester\", \"\", \"\") or label_replace(vector(0), \"component\", \"query-frontend\", \"\", \"\") or label_replace(vector(0), \"component\", \"query-scheduler\", \"\", \"\") or label_replace(vector(0), \"component\", \"querier\", \"\", \"\") or label_replace(vector($series * $retention_days * 86400 / $scrape_interval * 2 * 0.001 * 3 / 1e9), \"component\", \"store-gateway\", \"\", \"\") or label_replace(vector(0), \"component\", \"ruler\", \"\", \"\") or label_replace(clamp_min(ceil(vector($series / 20000000)), 1) * 300, \"component\", \"compactor\", \"\", \"\") or label_replace(vector(0), \"component\", \"alertmanager\", \"\", \"\")) / $rf, \"scope\", \"per instance (÷ RF, rough)\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "C"
+        }
+      ],
+      "title": "Monolithic mode",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Memory +50%",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #B"
+                }
+              },
+              "operator": "*",
+              "right": {
+                "fixed": "1.5"
+              }
+            },
+            "mode": "binary"
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Disk +50%",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #C"
+                }
+              },
+              "operator": "*",
+              "right": {
+                "fixed": "1.5"
+              }
+            },
+            "mode": "binary"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "CPU cores",
+              "Value #B": "Memory",
+              "Value #C": "Disk"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "scope"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "now"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "peak"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "id": 5,
+      "options": {
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (url) (rate(prometheus_remote_storage_samples_total{$alloy_selector}[5m])) + (sum by (url) (rate(prometheus_remote_storage_histograms_total{$alloy_selector}[5m])) or sum by (url) (rate(prometheus_remote_storage_samples_total{$alloy_selector}[5m])) * 0)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max_over_time((sum by (url) (rate(prometheus_remote_storage_samples_total{$alloy_selector}[5m])) + (sum by (url) (rate(prometheus_remote_storage_histograms_total{$alloy_selector}[5m])) or sum by (url) (rate(prometheus_remote_storage_samples_total{$alloy_selector}[5m])) * 0))[$__range:1m])",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "B"
+        }
+      ],
+      "title": "Alloy → remote_write (samples/s, floats + native histograms)",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "now",
+              "Value #B": "peak"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "entries/s now"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "entries/s peak"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "bytes/s now"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Bps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "bytes/s peak"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Bps"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
+      "id": 6,
+      "options": {
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (host) (rate(loki_write_sent_entries_total{$alloy_selector}[5m]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max_over_time((sum by (host) (rate(loki_write_sent_entries_total{$alloy_selector}[5m])))[$__range:1m])",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (host) (rate(loki_write_sent_bytes_total{$alloy_selector}[5m]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max_over_time((sum by (host) (rate(loki_write_sent_bytes_total{$alloy_selector}[5m])))[$__range:1m])",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "D"
+        }
+      ],
+      "title": "Alloy → Loki (loki.write)",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "entries/s now",
+              "Value #B": "entries/s peak",
+              "Value #C": "bytes/s now",
+              "Value #D": "bytes/s peak"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Scale out if consistently > 0.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "none"
+        },
+        "overrides": null
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 7,
+      "options": {
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (instance) (rate(memcached_items_evicted_total[5m]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max_over_time((sum by (instance) (rate(memcached_items_evicted_total[5m])))[$__range:1m])",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "",
+          "range": false,
+          "refId": "B"
+        }
+      ],
+      "title": "Memcached evictions/s",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "now",
+              "Value #B": "peak"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": [
+    "mimir",
+    "capacity"
+  ],
+  "templating": {
+    "list": [
+      {
+        "label": "Datasource",
+        "name": "datasource",
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "text": "3",
+          "value": "3"
+        },
+        "description": "Ingester replication factor",
+        "label": "Replication factor",
+        "name": "rf",
+        "options": [
+          {
+            "selected": true,
+            "text": "3",
+            "value": "3"
+          }
+        ],
+        "query": "3",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "365",
+          "value": "365"
+        },
+        "description": "Block retention, drives store-gateway disk",
+        "label": "Retention (days)",
+        "name": "retention_days",
+        "options": [
+          {
+            "selected": true,
+            "text": "365",
+            "value": "365"
+          }
+        ],
+        "query": "365",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "description": "Extra matchers for Alloy self-metrics, e.g. job=\"integrations/alloy\"",
+        "label": "Alloy matchers",
+        "name": "alloy_selector",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": ".*",
+          "value": ".*"
+        },
+        "description": "Regex on remote_write url label counted as Mimir ingest",
+        "label": "Mimir URL regex",
+        "name": "mimir_url_regex",
+        "options": [
+          {
+            "selected": true,
+            "text": ".*",
+            "value": ".*"
+          }
+        ],
+        "query": ".*",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "0",
+          "value": "0"
+        },
+        "description": "0 = measured",
+        "label": "Override: active series",
+        "name": "ov_series",
+        "options": [
+          {
+            "selected": true,
+            "text": "0",
+            "value": "0"
+          }
+        ],
+        "query": "0",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "0",
+          "value": "0"
+        },
+        "description": "0 = measured",
+        "label": "Override: samples/s",
+        "name": "ov_samples",
+        "options": [
+          {
+            "selected": true,
+            "text": "0",
+            "value": "0"
+          }
+        ],
+        "query": "0",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "0",
+          "value": "0"
+        },
+        "description": "0 = derived, else 15",
+        "label": "Override: scrape interval (s)",
+        "name": "ov_scrape_interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "0",
+            "value": "0"
+          }
+        ],
+        "query": "0",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "0",
+          "value": "0"
+        },
+        "description": "0 = measured",
+        "label": "Override: queries/s",
+        "name": "ov_qps",
+        "options": [
+          {
+            "selected": true,
+            "text": "0",
+            "value": "0"
+          }
+        ],
+        "query": "0",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "0",
+          "value": "0"
+        },
+        "description": "0 = measured",
+        "label": "Override: rule evals/s",
+        "name": "ov_rules",
+        "options": [
+          {
+            "selected": true,
+            "text": "0",
+            "value": "0"
+          }
+        ],
+        "query": "0",
+        "type": "textbox"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result(max_over_time((sum(prometheus_tsdb_head_series) or sum(prometheus_remote_write_wal_storage_active_series{$alloy_selector}) or sum(cortex_ingester_memory_series) / $rf)[$__range:1m]) or vector(0))",
+        "hide": 2,
+        "label": "Measured active series",
+        "name": "m_series",
+        "query": {
+          "qryType": 3,
+          "query": "query_result(max_over_time((sum(prometheus_tsdb_head_series) or sum(prometheus_remote_write_wal_storage_active_series{$alloy_selector}) or sum(cortex_ingester_memory_series) / $rf)[$__range:1m]) or vector(0))",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/\\} (\\S+) \\S+$/",
+        "type": "query"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result(max_over_time((sum(rate(prometheus_remote_storage_samples_total{url=~\"$mimir_url_regex\",$alloy_selector}[5m])) + (sum(rate(prometheus_remote_storage_histograms_total{url=~\"$mimir_url_regex\",$alloy_selector}[5m])) or sum(rate(prometheus_remote_storage_samples_total{url=~\"$mimir_url_regex\",$alloy_selector}[5m])) * 0) or sum(rate(cortex_distributor_received_samples_total[5m])))[$__range:1m]) or vector(0))",
+        "hide": 2,
+        "label": "Measured samples/s",
+        "name": "m_samples",
+        "query": {
+          "qryType": 3,
+          "query": "query_result(max_over_time((sum(rate(prometheus_remote_storage_samples_total{url=~\"$mimir_url_regex\",$alloy_selector}[5m])) + (sum(rate(prometheus_remote_storage_histograms_total{url=~\"$mimir_url_regex\",$alloy_selector}[5m])) or sum(rate(prometheus_remote_storage_samples_total{url=~\"$mimir_url_regex\",$alloy_selector}[5m])) * 0) or sum(rate(cortex_distributor_received_samples_total[5m])))[$__range:1m]) or vector(0))",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/\\} (\\S+) \\S+$/",
+        "type": "query"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result((vector($ov_qps) > 0) or max_over_time((sum(rate(cortex_query_frontend_queries_total{op=~\"query|query_range\"}[5m])) or sum(rate(prometheus_http_requests_total{handler=~\"/api/v1/query(_range)?\"}[5m])))[$__range:1m]) or vector(0))",
+        "hide": 2,
+        "label": "Queries/s",
+        "name": "qps",
+        "query": {
+          "qryType": 3,
+          "query": "query_result((vector($ov_qps) > 0) or max_over_time((sum(rate(cortex_query_frontend_queries_total{op=~\"query|query_range\"}[5m])) or sum(rate(prometheus_http_requests_total{handler=~\"/api/v1/query(_range)?\"}[5m])))[$__range:1m]) or vector(0))",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/\\} (\\S+) \\S+$/",
+        "type": "query"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result((vector($ov_rules) > 0) or max_over_time((sum(rate(cortex_prometheus_rule_evaluations_total[5m])) or sum(rate(prometheus_rule_evaluations_total[5m])))[$__range:1m]) or vector(0))",
+        "hide": 2,
+        "label": "Rule evals/s",
+        "name": "rules",
+        "query": {
+          "qryType": 3,
+          "query": "query_result((vector($ov_rules) > 0) or max_over_time((sum(rate(cortex_prometheus_rule_evaluations_total[5m])) or sum(rate(prometheus_rule_evaluations_total[5m])))[$__range:1m]) or vector(0))",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/\\} (\\S+) \\S+$/",
+        "type": "query"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result(max_over_time((sum(rate(alertmanager_alerts_received_total[5m])) or sum(rate(cortex_alertmanager_alerts_received_total[5m])))[$__range:1m]) or vector(0))",
+        "hide": 2,
+        "label": "Alert notifications/s",
+        "name": "notifications",
+        "query": {
+          "qryType": 3,
+          "query": "query_result(max_over_time((sum(rate(alertmanager_alerts_received_total[5m])) or sum(rate(cortex_alertmanager_alerts_received_total[5m])))[$__range:1m]) or vector(0))",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/\\} (\\S+) \\S+$/",
+        "type": "query"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result(max_over_time((sum(alertmanager_alerts) or sum(cortex_alertmanager_alerts))[$__range:1m]) or vector(0))",
+        "hide": 2,
+        "label": "Firing alerts",
+        "name": "firing_alerts",
+        "query": {
+          "qryType": 3,
+          "query": "query_result(max_over_time((sum(alertmanager_alerts) or sum(cortex_alertmanager_alerts))[$__range:1m]) or vector(0))",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/\\} (\\S+) \\S+$/",
+        "type": "query"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result((vector($ov_scrape_interval) > 0) or (vector($ov_series) / vector($ov_samples) > 0 < +Inf) or (vector($m_series) / vector($m_samples) > 0 < +Inf) or vector(15))",
+        "hide": 2,
+        "label": "Scrape interval (s)",
+        "name": "scrape_interval",
+        "query": {
+          "qryType": 3,
+          "query": "query_result((vector($ov_scrape_interval) > 0) or (vector($ov_series) / vector($ov_samples) > 0 < +Inf) or (vector($m_series) / vector($m_samples) > 0 < +Inf) or vector(15))",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/\\} (\\S+) \\S+$/",
+        "type": "query"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result((vector($ov_series) > 0) or (vector($ov_samples * $scrape_interval) > 0) or (vector($m_series) > 0) or vector($m_samples * $scrape_interval))",
+        "hide": 2,
+        "label": "Active series",
+        "name": "series",
+        "query": {
+          "qryType": 3,
+          "query": "query_result((vector($ov_series) > 0) or (vector($ov_samples * $scrape_interval) > 0) or (vector($m_series) > 0) or vector($m_samples * $scrape_interval))",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/\\} (\\S+) \\S+$/",
+        "type": "query"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "query_result((vector($ov_samples) > 0) or (vector($ov_series / $scrape_interval) > 0) or (vector($m_samples) > 0) or vector($m_series / $scrape_interval))",
+        "hide": 2,
+        "label": "Samples/s",
+        "name": "samples",
+        "query": {
+          "qryType": 3,
+          "query": "query_result((vector($ov_samples) > 0) or (vector($ov_series / $scrape_interval) > 0) or (vector($m_samples) > 0) or vector($m_series / $scrape_interval))",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "/\\} (\\S+) \\S+$/",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "title": "Mimir capacity sizing",
+  "uid": "mimir-sizer"
+}

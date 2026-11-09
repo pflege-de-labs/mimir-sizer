@@ -26,7 +26,7 @@ type Component struct {
 	Note               string
 }
 
-// Ratios from https://grafana.com/docs/mimir/latest/manage/run-production-environment/planning-capacity/
+// Ratios from https://grafana.com/docs/mimir/latest/manage/run-production-environment/planning-capacity/ (mirrored in cmd/dashgen).
 func Size(in Inputs) []Component {
 	series := in.ActiveSeries.V
 	inMem := series * float64(in.RF)

@@ -41,6 +41,24 @@ the report states the source of each value.
 Alloy throughput needs Alloy's own metrics in the queried source (`prometheus.exporter.self` or a scrape of
 `:12345/metrics`). Narrow them with `--alloy-selector 'job="integrations/alloy"'`.
 
+## Grafana dashboard
+
+`deploy/grafana/` renders the same report in Grafana for a selectable Prometheus datasource.
+Peaks are taken over the dashboard time range; the CLI flags become dashboard variables
+(replication factor, retention, Alloy matchers, Mimir URL regex, `Override:` textboxes, `0` = measured).
+
+```sh
+kubectl apply -k deploy/grafana   # ConfigMap (sidecar label grafana_dashboard=1) + GrafanaDashboard CR
+```
+
+- The ConfigMap is picked up by the Grafana sidecar (kube-prometheus-stack), folder `Mimir` via the `grafana_folder` annotation.
+- The `GrafanaDashboard` (grafana-operator v5) reads the same ConfigMap via `configMapRef`. Adjust its
+  `instanceSelector` to your Grafana CR's labels. If a cluster runs both sidecar and operator against the same
+  Grafana, the dashboard is imported twice — drop the one you don't use.
+- Without Kubernetes, import `deploy/grafana/mimir-sizer-dashboard.json` in the Grafana UI.
+- The JSON is generated: edit `cmd/dashgen`, then `go generate ./...` (a test fails on drift).
+- Textbox values are interpolated raw except that `\` and `'` get escaped by the Prometheus datasource, so avoid backslashes in the regex variables.
+
 ## Caveats
 
 - Inputs that are neither set nor found are `0` (shown as `unknown`), so e.g. querier sizing comes out as 0.

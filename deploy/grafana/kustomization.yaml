@@ -1,0 +1,18 @@
+# `kubectl apply -k deploy/grafana` creates the dashboard ConfigMap (picked up by the
+# Grafana sidecar via its grafana_dashboard label) and the grafana-operator GrafanaDashboard
+# that reads the same ConfigMap, so the JSON exists exactly once.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - grafanadashboard.yaml
+configMapGenerator:
+  - name: mimir-sizer-dashboard
+    files:
+      - mimir-sizer-dashboard.json
+    options:
+      # Stable name: the GrafanaDashboard configMapRef points at it.
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
+      annotations:
+        grafana_folder: Mimir

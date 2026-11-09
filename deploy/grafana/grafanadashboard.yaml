@@ -1,0 +1,25 @@
+# Dashboard for grafana-operator v5 (grafana.integreatly.org/v1beta1).
+# The model comes from the ConfigMap that kustomization.yaml generates from
+# mimir-sizer-dashboard.json (regenerate with `go generate ./...`).
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: mimir-sizer
+spec:
+  # Required. Must match the labels on the Grafana CR this should be imported
+  # into — `dashboards: grafana` is the operator's own example label, so change
+  # it if your Grafana instance is labelled differently, or nothing imports and
+  # the CR reports NoMatchingInstances.
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+
+  folder: Mimir
+
+  # The operator re-reads the model on this interval, so editing the ConfigMap
+  # is enough to roll out a dashboard change.
+  resyncPeriod: 10m
+
+  configMapRef:
+    name: mimir-sizer-dashboard
+    key: mimir-sizer-dashboard.json

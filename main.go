@@ -2,6 +2,8 @@
 // and prints a sizing report for monolithic and microservices deployments plus Alloy write throughput.
 package main
 
+//go:generate go run ./cmd/dashgen deploy/grafana/mimir-sizer-dashboard.json
+
 import (
 	"context"
 	"fmt"
